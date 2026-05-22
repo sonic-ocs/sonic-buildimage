@@ -1,15 +1,18 @@
 [submodule "sonic-swss-common"]
 	path = src/sonic-swss-common
 	url = https://github.com/sonic-ocs/sonic-swss-common
+	branch = ocs-dev
 [submodule "sonic-linux-kernel"]
 	path = src/sonic-linux-kernel
 	url = https://github.com/sonic-net/sonic-linux-kernel
 [submodule "sonic-sairedis"]
 	path = src/sonic-sairedis
 	url = https://github.com/sonic-ocs/sonic-sairedis
+	branch = ocs-dev
 [submodule "sonic-swss"]
 	path = src/sonic-swss
 	url = https://github.com/sonic-ocs/sonic-swss
+	branch = ocs-dev
 [submodule "src/p4c-bm/p4c-bm"]
 	path = platform/p4/p4c-bm/p4c-bm
 	url = https://github.com/krambn/p4c-bm
@@ -31,6 +34,7 @@
 [submodule "src/sonic-utilities"]
 	path = src/sonic-utilities
 	url = https://github.com/sonic-ocs/sonic-utilities
+	branch = ocs-dev
 [submodule "platform/broadcom/sonic-platform-modules-arista"]
 	path = platform/broadcom/sonic-platform-modules-arista
 	url = https://github.com/aristanetworks/sonic
@@ -77,6 +81,7 @@
 [submodule "src/sonic-mgmt-common"]
 	path = src/sonic-mgmt-common
 	url = https://github.com/sonic-ocs/sonic-mgmt-common.git
+	branch = ocs-dev
 [submodule "src/wpasupplicant/sonic-wpa-supplicant"]
 	path = src/wpasupplicant/sonic-wpa-supplicant
 	url = https://github.com/sonic-net/sonic-wpa-supplicant.git
