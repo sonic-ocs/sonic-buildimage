@@ -1,0 +1,219 @@
+module sonic-ocs-states {
+
+  yang-version 1.1;
+
+  namespace "http://github.com/sonic-net/sonic-ocs-states";
+  prefix ocs-states;
+
+  description "YANG model for SONiC OCS operational data";
+
+  revision "2024-11-21" {
+    description "Initial revision.";
+  }
+
+  typedef simplex_port_name {
+    type string;
+    description
+      "Unique identifier for a simplex port, such as 1A, 64B, etc.";
+  }
+
+  typedef cross_connect_name {
+    type string;
+    description
+      "Unique identifier for a cross-connect
+      e.g. identifiers are two simplex port identifiers separated by a hyphen, such as 1A-2B, 3924A-2394B, etc.";
+
+  }
+
+  typedef port_oper_status {
+    type enumeration {
+      enum blocked {
+        value 0;
+        description
+          "Default status for any port with no config";
+      }
+      enum tuning {
+        value 1;
+        description
+          "Status when device is performing the switching";
+      }
+      enum tuned {
+        value 2;
+        description
+          "Status when the device has finished switching";
+      }
+      enum failed {
+        value 3;
+        description
+          "It is meant as a status in the port tuning state machine, for example, when software fails to apply a beam steering state to the OCS module due to some communication issue. 
+          It is up to the vendor to determine what constitutes a failure in port tuning. 
+          Note that the failed status is not an all-inclusive status but only used at times that the software knows of a certain failure in tuning";
+      }
+    }
+    description
+      "Status of the port";
+  }
+
+  container sonic-ocs-states {
+
+    container OCS_PORT {
+      // config false;
+
+      description
+        "Inventory (as-built) and operational data for all possible ports";
+      list OCS_PORT_LIST {
+        key "simplex_port_id";
+        leaf simplex_port_id {
+          type simplex_port_name;
+          description
+            "Simplex port ID";
+        }
+        leaf connector_type {
+          type string;
+          description
+            "Connector type, e.g., Duplex LC, MPO/MTP, etc.";
+        }
+        leaf connector_pin {
+          type string;
+          description
+            "Position of the fiber strand in the connector, e.g., 2.";
+        }
+        leaf target_simplex_port_id {
+          type simplex_port_name;
+          description
+            "Target simplex port ID from cross-connect config status.
+            Ensure that this status is updated as soon as the cross-connect
+            is applied and a target is set.";
+        }
+        leaf status {
+          type port_oper_status;
+          description
+            "Operational status of the port";
+        }
+      }
+    }
+
+    container OCS_CROSS_CONNECT {
+        // config false;
+        description
+          "Operational data containing all connected cross-connects";
+    
+        list OCS_CROSS_CONNECT_LIST {
+          key "cross_connect_id";
+    
+          leaf cross_connect_id {
+            type cross_connect_name;
+            description "Unique identifier for the cross-connect";
+          }
+    
+          leaf a_side {
+            type leafref {
+              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST/simplex_port_id";
+            }
+            description "Simplex port ID for side A";
+          }
+    
+          leaf b_side {
+            type leafref {
+              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST/simplex_port_id";
+            }
+            description "Simplex port ID for side B";
+          }
+    
+          leaf a_side_status {
+            type leafref {
+              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST"
+                 + "[simplex_port_id = current()/../a_side]/status";
+            }
+            description "Status (port_oper_status) from OCS_PORT_LIST for side A";
+          }
+
+          leaf b_side_status {
+            type leafref {
+              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST"
+                 + "[simplex_port_id = current()/../b_side]/status";
+            }
+            description "Status (port_oper_status) from OCS_PORT_LIST for side B";
+          }
+        }
+    }
+
+    container OCS_CROSS_CONNECT_PHYSICAL_PATH {
+      // config false;
+
+      description
+        "Inventory data for all possible cross-connects, and their corresponding physical path information.
+        Note that because this represents all _possible_ cross connects, the length of this list depends on the number of ports.
+        For example, an 8x8 switch will have 64 entries in this list.";
+      list OCS_CROSS_CONNECT_PHYSICAL_PATH_LIST {
+        key "cross_connect_id";
+        leaf cross_connect_id {
+          type cross_connect_name;
+          description
+            "Unique identifier for the cross-connect";
+        }
+
+        leaf-list physical_path {
+          type string;
+          description
+            "Sequence of elements in the physical path that starts
+            and ends with the simplex_port_id at side A and B of the
+            cross-connect, respectively, and list all the elements
+            in between (e.g., 1A, fiber array A 5, panel A cell 10, 
+            panel B cell 45, fiber array B 6, 2B)";
+        }
+      }
+    }
+
+    container OCS_FACTORY_INSERTION_LOSS {
+      // config false;
+
+      description
+        "Inventory data for all possible cross-connects,
+        factory insertion loss measurements.";
+      list OCS_FACTORY_INSERTION_LOSS_LIST {
+        key "cross_connect_id frequency_THz temperature_C";
+
+        leaf cross_connect_id {
+          type cross_connect_name;
+          description
+            "Unique identifier for the cross-connect";
+        }
+        leaf temperature_C {
+          type decimal64 {
+            fraction-digits 2;
+          }
+          description
+            "Internal temperature sensor that correlates with the
+            ambient temperature at which the insertion loss is measured
+            in Celsius, e.g., 25.00.
+            NOTE: If multiple temperature sensors exist on the device,
+            select the temperature sensor that OCS engine calibration is
+            most sensitive to.";
+        }
+        leaf frequency_THz {
+          type decimal64 {
+            fraction-digits 3;
+          }
+          description
+            "Center frequency in THz at which insertion loss is measured,
+            e.g., 229.100 (O-band) 193.500";
+        }
+        leaf loss_dB {
+          type decimal64 {
+            fraction-digits 2;
+          }
+          description
+            "Factory insertion loss in dB, e.g. 1.23";
+        }
+        leaf accuracy_dB {
+          type decimal64 {
+            fraction-digits 2;
+          }
+          description
+            "Insertion loss measurement accuracy in dB e.g. 0.05";
+        }
+      }
+    }
+  }
+}
