@@ -3230,6 +3230,22 @@
             "DEBUG_4|DIP_LINK_LOCAL": {},
             "DEBUG_4|SIP_LINK_LOCAL": {}
         },
+        "OCS_PORT": {
+            "1A": {
+                "label": "debug",
+                "state": "normal"
+            },
+            "1B": {
+                "label": "debug",
+                "state": "normal"
+            }
+        },
+        "OCS_CROSS_CONNECT":{
+            "1A-1B":{
+                "a_side": "1A",
+                "b_side": "1B"
+            }
+        },
         "HIGH_FREQUENCY_TELEMETRY_PROFILE": {
             "dummy": {
                 "stream_state": "disabled",
