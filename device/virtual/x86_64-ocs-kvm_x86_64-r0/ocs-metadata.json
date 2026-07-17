@@ -1,0 +1,8 @@
+{
+    "DEVICE_METADATA": {
+        "localhost": {
+            "type": "SonicOCS",
+            "switch_type": "ocs"
+        }
+    }
+}

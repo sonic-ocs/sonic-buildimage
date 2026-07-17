@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# generate config and show sonic-loopback-interface
+sonic-cli-gen generate config sonic-loopback-interface
+
+# generate config and show sonic-bgp-global and sonic-bgp-neighbor
+sonic-cli-gen generate config sonic-bgp-global 
+sonic-cli-gen generate show sonic-bgp-global
+sonic-cli-gen generate config sonic-bgp-neighbor 
+sonic-cli-gen generate show sonic-bgp-neighbor

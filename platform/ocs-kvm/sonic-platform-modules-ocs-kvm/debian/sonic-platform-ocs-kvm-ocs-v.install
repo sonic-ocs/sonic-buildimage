@@ -1,0 +1,3 @@
+ocs-v/sonic_platform-1.0-py3-none-any.whl usr/share/sonic/device/x86_64-ocs-kvm_x86_64-r0
+systemd/ocs-config.sh usr/bin
+systemd/ocs-config.service lib/systemd/system
