@@ -1,0 +1,9 @@
+#DPKG FRK
+include $(PLATFORM_PATH)/sai.dep
+include $(PLATFORM_PATH)/docker-syncd-ocs-kvm.dep
+include $(PLATFORM_PATH)/platform-modules-ocs-kvm.dep
+include $(PLATFORM_PATH)/sonic-version.dep
+include $(PLATFORM_PATH)/one-image.dep
+include $(PLATFORM_PATH)/onie.dep
+include $(PLATFORM_PATH)/kvm-image.dep
+include $(PLATFORM_PATH)/raw-image.dep

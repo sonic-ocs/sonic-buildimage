@@ -1,0 +1,14 @@
+#!/bin/bash
+
+PLATFORM=${PLATFORM:-`sonic-cfggen -H -v DEVICE_METADATA.localhost.platform`}
+DEST_FILE="/etc/sonic/config_db.json"
+PRESET=(`head -n 1 /usr/share/sonic/device/$PLATFORM/default_sku`)
+HW_KEY=${PRESET[0]}
+DEFAULT_PRESET=${PRESET[1]}
+FACTORY_DEFAULT_HOOKS=/etc/config-setup/factory-default-hooks.d
+MGMT_CONFIG="/etc/config-setup/factory-default-hooks.d/topology-config.json"
+
+
+# generate config and save to config_db.json
+sonic-cfggen -H -k ${HW_KEY}  -j ${MGMT_CONFIG} --preset ${DEFAULT_PRESET} > ${DEST_FILE}  
+

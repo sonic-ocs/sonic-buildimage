@@ -1,0 +1,30 @@
+#
+{% block banner %}
+# =============== Managed by SONiC Config Engine DO NOT EDIT! ===============
+# generated from /usr/share/sonic/device/<platform>/mgmt-interface.j2 using sonic-cfggen
+# file: /etc/network/interfaces.d/
+#
+{% endblock banner %}
+
+{% block mgmt_interface %}
+# The management network interface
+{% set found = {'eth4': 'false'} %}
+{% if MGMT_INTERFACE %}
+    {% for (name, prefix) in MGMT_INTERFACE|pfx_filter|unique(attribute=0) %}
+        {% if name == 'eth4' %}
+            {% set _ = found.update({'eth4': 'true'}) %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
+{% if found.eth4 != 'true' %}
+    auto eth4
+    iface eth4 inet dhcp
+        metric 202
+        {% if (MGMT_VRF_CONFIG) and (MGMT_VRF_CONFIG['vrf_global']['mgmtVrfEnabled'] == "true") %}
+            vrf mgmt
+        {% endif %}
+    iface eth4 inet6 dhcp
+        up sysctl net.ipv6.conf.eth4.accept_ra=1
+        down sysctl net.ipv6.conf.eth4.accept_ra=0
+{% endif %}
+{% endblock mgmt_interface %}

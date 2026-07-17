@@ -1,0 +1,18 @@
+#!/bin/bash
+
+PLATFORM=${PLATFORM:-`sonic-cfggen -H -v DEVICE_METADATA.localhost.platform`}
+MGMT_INTERFACE_TEMPLATE="/usr/share/sonic/device/$PLATFORM/plugins/mgmt-interface.j2"
+
+# generate config and show sonic-mgmt_port
+sonic-cli-gen generate show sonic-mgmt_port
+sonic-cli-gen generate config sonic-mgmt_port
+
+# generate config and show sonic-syslog
+sonic-cli-gen generate config sonic-syslog
+sonic-cli-gen generate show sonic-syslog
+
+# according to the mgmt interface configuration, generate eth4 dhcp configuration
+CFGGEN_PARAMS=" \
+    -d -t $MGMT_INTERFACE_TEMPLATE,/etc/network/interfaces.d/mgmt-interface
+"
+sonic-cfggen $CFGGEN_PARAMS

@@ -1,0 +1,29 @@
+{                                                                                                                                                                  
+    "MGMT_INTERFACE": {
+        "eth0|192.168.1.100/24": {
+            "gwaddr": "192.168.1.8"
+        },
+        "eth1|192.168.2.100/24": {
+            "gwaddr": "192.168.2.8"
+        }
+    },
+     "MGMT_PORT": {
+        "eth0": {
+                "admin_status": "up",
+                "alias": "eth0"
+        },
+        "eth1": {
+                "admin_status": "up",
+                "alias": "eth1"
+        },
+        "eth4": {
+                "admin_status": "up",
+                "alias": "eth4"
+        }
+    },
+    "SSH_SERVER": {
+        "POLICIES":{
+            "inactivity_timeout": "35000"
+       }
+    }
+}

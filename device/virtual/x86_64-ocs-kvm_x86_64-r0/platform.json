@@ -1,0 +1,152 @@
+{
+    "chassis": {
+        "components": [],
+        "fan_drawers": {
+            "fans": [
+                {
+                    "name": "FanTray0-Fan0",
+                    "speed": {
+                        "controllable": true
+                    },
+                    "status_led": {
+                        "status_led": true
+                    }
+                },
+                {
+                    "name": "FanTray0-Fan1",
+                    "speed": {
+                        "controllable": true
+                    },
+                    "status_led": {
+                        "status_led": true
+                    }
+                },
+                {
+                    "name": "FanTray0-Fan2",
+                    "speed": {
+                        "controllable": true
+                    },
+                    "status_led": {
+                        "status_led": true
+                    }
+                },
+                {
+                    "name": "FanTray0-Fan3",
+                    "speed": {
+                        "controllable": true
+                    },
+                    "status_led": {
+                        "status_led": true
+                    }
+                }
+            ],
+            "name": "FanTray0",
+            "status_led": {
+                "controllable": true
+            }
+        },
+        "modules": [
+            {
+                "components": [
+                    {
+                        "description": "Optical Circuit Switch of 16x16",
+                        "name": "OCS0-0"
+                    }
+                ],
+                "description": "Working optical card",
+                "name": "LINE-CARD0"
+            },
+            {
+                "components": [
+                    {
+                        "description": "Performs initialization of hardware components during booting",
+                        "name": "BIOS"
+                    },
+                    {
+                        "description": "Platform managment controller for on-board components",
+                        "name": "FPGA"
+                    },
+                    {
+                        "description": "Used for managing IO modules",
+                        "name": "CPLD"
+                    },
+                    {
+                        "description": "Open network install environment",
+                        "name": "ONIE"
+                    }
+                ],
+                "description": "Supervisor module",
+                "name": "SUPERVISOR0"
+            }
+        ],
+        "name": "OCS",
+        "psus": [
+            {
+                "fans": [
+                    {
+                        "name": "PSU0-Fan",
+                        "speed": {
+                            "controllable": false
+                        },
+                        "status_led": {
+                            "available": false
+                        }
+                    }
+                ],
+                "name": "PSU0",
+                "status_led": {
+                    "status_led": false
+                }
+            },
+            {
+                "fans": [
+                    {
+                        "name": "PSU1-Fan",
+                        "speed": {
+                            "controllable": false
+                        },
+                        "status_led": {
+                            "available": false
+                        }
+                    }
+                ],
+                "name": "PSU1",
+                "status_led": {
+                    "status_led": false
+                }
+            }
+        ],
+        "status_led": {
+            "colors": [
+                "off",
+                "red",
+                "green",
+                "amber",
+                "red blink",
+                "green blink",
+                "amber blink"
+            ],
+            "controllable": true
+        },
+        "thermal_manager": false,
+        "thermals": [
+            {
+                "controllable": false,
+                "high-crit-threshold": false,
+                "low-crit-threshold": false,
+                "maximum-recorded": false,
+                "minimum-recorded": false,
+                "name": "System Exhaust"
+            },
+            {
+                "controllable": false,
+                "high-crit-threshold": false,
+                "low-crit-threshold": false,
+                "maximum-recorded": false,
+                "minimum-recorded": false,
+                "name": "System Board"
+            }
+        ]
+    },
+    "interfaces": {}
+}

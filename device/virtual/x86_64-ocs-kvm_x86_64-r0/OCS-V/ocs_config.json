@@ -1,0 +1,198 @@
+{
+  "OCS_PORT": {
+    "1A": {
+      "label": "ingress_port1",
+      "config_status": "normal"
+    },
+    "2A": {
+      "label": "ingress_port2",
+      "config_status": "normal"
+    },
+    "3A": {
+      "label": "ingress_port3",
+      "config_status": "normal"
+    },
+    "4A": {
+      "label": "ingress_port4",
+      "config_status": "normal"
+    },
+    "5A": {
+      "label": "ingress_port5",
+      "config_status": "normal"
+    },
+    "6A": {
+      "label": "ingress_port6",
+      "config_status": "normal"
+    },
+    "7A": {
+      "label": "ingress_port7",
+      "config_status": "normal"
+    },
+    "8A": {
+      "label": "ingress_port8",
+      "config_status": "normal"
+    },
+    "9A": {
+      "label": "ingress_port9",
+      "config_status": "normal"
+    },
+    "10A": {
+      "label": "ingress_port10",
+      "config_status": "normal"
+    },
+    "11A": {
+      "label": "ingress_port11",
+      "config_status": "normal"
+    },
+    "12A": {
+      "label": "ingress_port12",
+      "config_status": "normal"
+    },
+    "13A": {
+      "label": "ingress_port13",
+      "config_status": "normal"
+    },
+    "14A": {
+      "label": "ingress_port14",
+      "config_status": "normal"
+    },
+    "15A": {
+      "label": "ingress_port15",
+      "config_status": "normal"
+    },
+    "16A": {
+      "label": "ingress_port16",
+      "config_status": "normal"
+    },
+    "1B": {
+      "label": "egress_port1",
+      "config_status": "normal"
+    },
+    "2B": {
+      "label": "egress_port2",
+      "config_status": "normal"
+    },
+    "3B": {
+      "label": "egress_port3",
+      "config_status": "normal"
+    },
+    "4B": {
+      "label": "egress_port4",
+      "config_status": "normal"
+    },
+    "5B": {
+      "label": "egress_port5",
+      "config_status": "normal"
+    },
+    "6B": {
+      "label": "egress_port6",
+      "config_status": "normal"
+    },
+    "7B": {
+      "label": "egress_port7",
+      "config_status": "normal"
+    },
+    "8B": {
+      "label": "egress_port8",
+      "config_status": "normal"
+    },
+    "9B": {
+      "label": "egress_port9",
+      "config_status": "normal"
+    },
+    "10B": {
+      "label": "egress_port10",
+      "config_status": "normal"
+    },
+    "11B": {
+      "label": "egress_port11",
+      "config_status": "normal"
+    },
+    "12B": {
+      "label": "egress_port12",
+      "config_status": "normal"
+    },
+    "13B": {
+      "label": "egress_port13",
+      "config_status": "normal"
+    },
+    "14B": {
+      "label": "egress_port14",
+      "config_status": "normal"
+    },
+    "15B": {
+      "label": "egress_port15",
+      "config_status": "normal"
+    },
+    "16B": {
+      "label": "egress_port16",
+      "config_status": "normal"
+    }
+  },
+  "OCS_CROSS_CONNECT": {
+    "1A-16B": {
+      "a_side": "1A",
+      "b_side": "16B"
+    },
+    "2A-15B": {
+      "a_side": "2A",
+      "b_side": "15B"
+    },
+    "3A-14B": {
+      "a_side": "3A",
+      "b_side": "14B"
+    },
+    "4A-13B": {
+      "a_side": "4A",
+      "b_side": "13B"
+    },
+    "5A-12B": {
+      "a_side": "5A",
+      "b_side": "12B"
+    },
+    "6A-11B": {
+      "a_side": "6A",
+      "b_side": "11B"
+    },
+    "7A-10B": {
+      "a_side": "7A",
+      "b_side": "10B"
+    },
+    "8A-9B": {
+      "a_side": "8A",
+      "b_side": "9B"
+    },
+    "9A-8B": {
+      "a_side": "9A",
+      "b_side": "8B"
+    },
+    "10A-7B": {
+      "a_side": "10A",
+      "b_side": "7B"
+    },
+    "11A-6B": {
+      "a_side": "11A",
+      "b_side": "6B"
+    },
+    "12A-5B": {
+      "a_side": "12A",
+      "b_side": "5B"
+    },
+    "13A-4B": {
+      "a_side": "13A",
+      "b_side": "4B"
+    },
+    "14A-3B": {
+      "a_side": "14A",
+      "b_side": "3B"
+    },
+    "15A-2B": {
+      "a_side": "15A",
+      "b_side": "2B"
+    },
+    "16A-1B": {
+      "a_side": "16A",
+      "b_side": "1B"
+    }
+  }
+}
