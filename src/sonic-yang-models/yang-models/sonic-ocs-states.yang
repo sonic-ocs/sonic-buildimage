@@ -57,7 +57,7 @@ module sonic-ocs-states {
   container sonic-ocs-states {
 
     container OCS_PORT {
-      // config false;
+      config false;
 
       description
         "Inventory (as-built) and operational data for all possible ports";
@@ -94,7 +94,7 @@ module sonic-ocs-states {
     }
 
     container OCS_CROSS_CONNECT {
-        // config false;
+        config false;
         description
           "Operational data containing all connected cross-connects";
     
@@ -139,7 +139,7 @@ module sonic-ocs-states {
     }
 
     container OCS_CROSS_CONNECT_PHYSICAL_PATH {
-      // config false;
+      config false;
 
       description
         "Inventory data for all possible cross-connects, and their corresponding physical path information.
@@ -166,7 +166,7 @@ module sonic-ocs-states {
     }
 
     container OCS_FACTORY_INSERTION_LOSS {
-      // config false;
+      config false;
 
       description
         "Inventory data for all possible cross-connects,

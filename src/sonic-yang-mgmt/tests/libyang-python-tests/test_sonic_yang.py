@@ -430,10 +430,7 @@ class Test_SonicYang(object):
         # event YANG models do not map directly to config_db and are included to NON_CONFIG_YANG_FILES at run time
         # If any more such helper yang files are added, we need to update here.
         EVENT_YANG_FILES = sum(1 for yang_model in syc.yangFiles if 'sonic-events' in yang_model)
-        # OCS state models (e.g. sonic-ocs-states.yang) model STATE_DB rather than
-        # config_db, so they do not appear in xlateJson either.
-        STATE_YANG_FILES = sum(1 for yang_model in syc.yangFiles if 'ocs-states' in yang_model)
-        NON_CONFIG_YANG_FILES = 5 + EVENT_YANG_FILES + STATE_YANG_FILES
+        NON_CONFIG_YANG_FILES = 5 + EVENT_YANG_FILES
         # read config
         jIn = self.readIjsonInput(test_file, 'SAMPLE_CONFIG_DB_JSON')
         jIn = json.loads(jIn)
@@ -444,7 +441,7 @@ class Test_SonicYang(object):
         # loaded in Data tree.
         assert len(syc.jIn) == numTables
         print("{}:{}".format(len(syc.xlateJson), len(syc.yangFiles)))
-        assert len(syc.xlateJson) == len(syc.yangFiles) - NON_CONFIG_YANG_FILES
+        assert len(syc.xlateJson) == len(syc.yangFiles) - len(syc.configfalseModules) - NON_CONFIG_YANG_FILES
         # Validate data tree
         validTree = False
         try:
