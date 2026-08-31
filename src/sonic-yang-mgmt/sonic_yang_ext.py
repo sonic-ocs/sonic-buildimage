@@ -135,7 +135,15 @@ class SonicYangExtMixin(SonicYangPathMixin):
             if top.name() != m.name():
                 raise SonicYangException("topLevelContainer mismatch {}:{}".format(
                     top.name(), m.name()))
+            # Skip top containers marked with 'config false'=0x02
+            if top.cdata.flags & 0x02:
+                self.configfalseModules.add(m.name())
+                continue
             for table in top.children(types=(ly.SNode.CONTAINER,)):
+                # Skip table containers marked with 'config false'=0x02
+                if table.cdata.flags & 0x02:
+                    self.configfalseModules.add(m.name())
+                    continue
                 self.confDbYangMap[table.name()] = {
                     'module': m.name(),
                     'topLevelContainer': top.name(),
