@@ -29,7 +29,7 @@ class SonicYang(SonicYangExtMixin, SonicYangPathMixin):
         # yang model files, need this map it to module
         self.yangFiles: List[str] = list()
         # set of yang modules that have config false container
-        self.configfalseModules = set()
+        self.configFalseModules = set()
         # map from TABLE in config DB to container and module
         self.confDbYangMap: Dict[str, Any] = dict()
         # map of backlinks dict()[]
