@@ -1,0 +1,96 @@
+module sonic-ocs {
+
+  yang-version 1.1;
+
+  namespace "http://github.com/sonic-net/sonic-ocs";
+  prefix ocs;
+
+  description "YANG model for SONiC OCS configuration data";
+
+  revision "2024-11-21" {
+    description "Initial revision.";
+  }
+
+  typedef simplex_port_name {
+    type string;
+    description
+      "Unique identifier for a simplex port, such as 1A, 64B, etc.";
+  }
+
+  typedef cross_connect_name {
+    type string;
+    description
+      "Unique identifier for a cross-connect
+      e.g. identifiers are two simplex port identifiers separated by a hyphen, such as 1A-2B, 3924A-2394B, etc.";
+
+  }
+
+  typedef port_config_override_state {
+    type enumeration {
+      enum normal {
+        value 0;
+        description
+          "Default, state to be determined by presence of cross-connect";
+      }
+      enum force_blocked {
+        value 1;
+        description
+          "Regardless of cross-connect presence state, blocks the port";
+      }
+    }
+    description
+      "Configuration state of the port";
+  }
+
+  container sonic-ocs {
+
+    container OCS_PORT {
+      description
+        "List of all device ports and their configuration state.";
+      list OCS_PORT_LIST {
+        key "simplex_port_id";
+        leaf simplex_port_id {
+          type simplex_port_name;
+          description
+            "Simplex port ID";
+        }
+        leaf label {
+          type string;
+          description
+            "Label. Can be used for LLDP-like neighbor router
+            port information for cable tracing if needed,
+            e.g., router1_port1";
+        }
+        leaf state {
+          type port_config_override_state;
+          description
+            "Configurable override state. It overrides the state imposed
+            by the programmed cross-connects (e.g., to block or power-off a
+            port). This feature is meant for running experiments
+            and for troubleshooting applications.";
+        }
+      }
+    }
+
+    container OCS_CROSS_CONNECT {
+      description
+        "List of ALL PROVISIONED cross-connects and their simplex port pairs.";
+      list OCS_CROSS_CONNECT_LIST {
+        key "cross_connect_id";
+        leaf cross_connect_id {
+          type cross_connect_name;
+          description
+            "Unique identifier for the cross-connect";
+        }
+        leaf a_side {
+          type simplex_port_name;
+          description "Simplex port ID for side A";
+        }
+        leaf b_side {
+          type simplex_port_name;
+          description "Simplex port ID for side B";
+        }
+      }
+    }
+  }
+}
