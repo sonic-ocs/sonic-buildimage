@@ -1,0 +1,497 @@
+# CI for sonic-ocs/sonic-buildimage, platform ocs-kvm.
+#
+# Two jobs. `build` compiles the ONIE installer (target/sonic-ocs-kvm.bin) from
+# scratch, with no build cache, and uploads it together with the ONIE recovery
+# ISO. `kvm-image` then installs that .bin into a fresh virtual disk and boots
+# it once, exactly as `make target/sonic-ocs-kvm.img.gz` does, producing
+# sonic-ocs-kvm.img.gz for use with KVM/QEMU. Both run on self-hosted runners
+# operated by the maintainers; how those are provisioned is documented
+# internally and is not part of this repository.
+#
+# Fork pull requests are built. Runs from outside collaborators wait for a
+# maintainer's approval first (a repository setting), so a first pull request's
+# checks may take a while to start.
+#
+# Artifacts of a successful run: `ocs-kvm-installer-<run>` (the .bin and the
+# ISO) and `sonic-buildimage.ocs-kvm-<run>` (the .img.gz, plus a UEFI variant
+# when the tooling supports it). On failure, the "Diagnose failure" step prints
+# the tail of the failing target's log, and every per-target log is attached
+# as an artifact.
+
+name: ocs-kvm-build
+
+on:
+  push:
+    branches: [ ocs-dev ]
+  pull_request:
+    branches: [ ocs-dev ]
+  workflow_dispatch:
+    inputs:
+      build_jobs:
+        description: SONIC_BUILD_JOBS. Empty lets rules/config choose from the runner's cores and RAM.
+        type: string
+        default: ''
+      build_memory:
+        description: SONIC_BUILD_MEMORY, e.g. 64g. Caps the build container's memory.
+        type: string
+        default: ''
+      nobookworm:
+        description: Skip the bookworm environment (default). ocs-kvm has no bookworm-based dockers. Set 0 to include it.
+        type: choice
+        default: '1'
+        options: [ '1', '0' ]
+
+# One build per ref. Not cancel-in-progress: a nearly finished build should not
+# be discarded by a follow-up push.
+concurrency:
+  group: ocs-kvm-build-${{ github.ref }}
+  cancel-in-progress: false
+
+# Reads the repository and writes artifacts; nothing else.
+permissions:
+  contents: read
+
+env:
+  # Deliberately not named PLATFORM. A job-level PLATFORM lands in every step's
+  # environment and reaches the build container, where sonic_py_common's
+  # get_platform() reads it and looks for a device directory that does not
+  # exist there; sonic-config-engine's tests then fail with "Failed to locate
+  # platform directory". It is passed to `make configure` only, which records
+  # it in .platform.
+  OCS_PLATFORM: ocs-kvm
+  # The ONIE recovery ISO first, then the installer. The ISO is a dependency of
+  # the KVM image target only (kvm-image.mk), so it has to be named here;
+  # onie.mk fetches it from a release, so it is a download, and going first it
+  # fails fast if that download fails. Do not add target/sonic-ocs-kvm.img.gz:
+  # both installers share one pattern rule in slave.mk, so naming both builds
+  # the filesystem twice. The kvm-image job produces the .img.gz from these two
+  # files instead.
+  BUILD_TARGETS: target/files/trixie/onie-recovery-x86_64-ocs-kvm_x86_64-r0.iso target/sonic-ocs-kvm.bin
+  BUILD_OPTIONS: USERNAME=admin SONIC_BUILD_RETRY_COUNT=0 SONIC_BUILD_RETRY_INTERVAL=0
+  ENABLE_FIPS: n
+  # No build cache, by design: every run builds from scratch, so nothing one
+  # build writes can feed another. The one thing reused is the slave container
+  # image, which is a function of the tree; when the runner already has the
+  # matching tag, `make configure` skips building it.
+  #
+  # SONIC_BUILD_JOBS is deliberately not $(nproc). rules/config computes
+  # min(nproc/4, ram_gb/8) clamped to [1,8], so each concurrent package build
+  # has the ~8 GB a dpkg-buildpackage can take; passing the core count
+  # over-subscribes RAM, and that fails as thrash and then as what looks like a
+  # random compile error. Empty trusts the formula.
+  SONIC_BUILD_JOBS: ${{ inputs.build_jobs }}
+  # Optional cap on the build container; rules/config then derives the job
+  # count from it as well.
+  SONIC_BUILD_MEMORY: ${{ inputs.build_memory }}
+  # The root Makefile enables both bookworm and trixie, and its %:: rule hands
+  # the real target only to the last enabled environment. For ocs-kvm the
+  # bookworm pass has nothing to build, but Makefile.work builds an
+  # environment's slave image before entering it, so on a runner without a
+  # cached sonic-slave-bookworm that empty pass would first build one. Default
+  # 1. If a bookworm-based docker is ever added, make fails on the missing
+  # target; dispatch with nobookworm=0. The expression applies the fallback
+  # only when the input is absent (pull_request/push), never to an explicit '0'.
+  NOBOOKWORM: ${{ inputs.nobookworm == '' && '1' || inputs.nobookworm }}
+
+jobs:
+  build:
+    name: build (ocs-kvm)
+    # Reports on every pull request, forks included, and may be made a required
+    # status check.
+    runs-on: [ self-hosted, ocs-build ]
+    # A full build from scratch every time; GitHub's default of 360 min is too
+    # tight.
+    timeout-minutes: 1440
+    env:
+      # A tree per run attempt, so a retry never inherits a half-built tree.
+      BUILD_DIR: ocs-kvm-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+    - name: Verify runner environment
+      # The maintainers' runners meet a set of requirements this build depends
+      # on. Refuse to run anywhere else. Do not weaken this step to get a build
+      # through; what each check means is documented internally.
+      run: |
+        set -uo pipefail
+        fail=0
+        bad() { echo "::error::$*"; fail=1; }
+
+        if [ -f /etc/ocs-fresh-instance ]; then
+          echo "ok   runner marker"
+        else
+          bad "runner marker missing"
+        fi
+
+        if [ -e /var/tmp/ocs-instance-used ]; then
+          bad "runner already used"
+        else
+          touch /var/tmp/ocs-instance-used && echo "ok   runner unused"
+        fi
+
+        if docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q 'name=rootless'; then
+          bad "docker mode is not the one this build expects"
+        else
+          echo "ok   docker mode"
+        fi
+
+        if id -nG | tr ' ' '\n' | grep -qx docker; then
+          echo "ok   docker group"
+        else
+          bad "runner user is not in the docker group"
+        fi
+
+        if ! command -v curl >/dev/null 2>&1; then
+          echo "::warning::curl not found; one check skipped"
+        elif curl -s -m 3 -H 'Metadata:true' \
+               'http://169.254.169.254/metadata/instance?api-version=2021-02-01' >/dev/null 2>&1; then
+          bad "network policy check failed"
+        else
+          echo "ok   network policy"
+        fi
+
+        if mountpoint -q /scratch; then
+          echo "ok   workspace disk ($(df -h /scratch | awk 'NR==2{print $4" free"}'))"
+        else
+          bad "workspace disk not mounted"
+        fi
+
+        if [ "${fail}" -ne 0 ]; then
+          echo "::error::Runner environment check failed; refusing to build. Maintainers: see the internal runbook."
+          exit 1
+        fi
+
+    - name: Checkout
+      # Pinned to a commit, not a tag; a tag is mutable. Update deliberately.
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        path: ${{ env.BUILD_DIR }}
+        # Nothing after this step needs the job token; do not leave it in
+        # .git/config.
+        persist-credentials: false
+        # `make init` handles submodules, in parallel.
+        submodules: false
+        # Full history: sonic-version derives the image version from git.
+        fetch-depth: 0
+
+    - name: make init
+      working-directory: ${{ env.BUILD_DIR }}
+      # Submodules only; no container yet.
+      run: make init
+
+    - name: Report build environment
+      # Informational: how rules/config will size the build, and whether the
+      # slave container image is already present. If it is, `make configure`
+      # skips building it; if not, it builds it from scratch and its log prints
+      # the tag it wants.
+      run: |
+        set -uo pipefail
+        cores=$(nproc 2>/dev/null || echo 4)
+        total_gb=$(awk '/^MemTotal/ {printf "%d", $2/1048576}' /proc/meminfo)
+        budget_gb="${total_gb}"
+        if [ -n "${SONIC_BUILD_MEMORY}" ]; then budget_gb="${SONIC_BUILD_MEMORY%[gG]}"; fi
+        by_cores=$(( cores / 4 )); [ "${by_cores}" -lt 1 ] && by_cores=1; [ "${by_cores}" -gt 8 ] && by_cores=8
+        by_ram=$(( budget_gb / 8 )); [ "${by_ram}" -lt 1 ] && by_ram=1
+        expected=$(( by_cores < by_ram ? by_cores : by_ram ))
+        echo "runner       : ${cores} cores, ${total_gb}g RAM"
+        echo "memory budget: ${budget_gb}g ($([ -n "${SONIC_BUILD_MEMORY}" ] && echo 'build_memory input' || echo 'all of the runner'))"
+        echo "expected jobs: ${SONIC_BUILD_JOBS:-${expected}} $([ -n "${SONIC_BUILD_JOBS}" ] && echo '(build_jobs input)' || echo "(min of cores/4=${by_cores}, budget/8=${by_ram})")"
+        free -g || true
+        df -h "${{ github.workspace }}" || true
+        echo "slave images present:"
+        docker images --format '  {{.Repository}}:{{.Tag}}  {{.Size}}' --filter 'reference=sonic-slave-*' | grep . \
+          || echo "  none: make configure will build sonic-slave-trixie from scratch"
+
+    - name: make configure PLATFORM=ocs-kvm
+      working-directory: ${{ env.BUILD_DIR }}
+      run: |
+        set -euxo pipefail
+        # PLATFORM is passed here only; see OCS_PLATFORM above.
+        cfg_args=(PLATFORM="${OCS_PLATFORM}" PLATFORM_ARCH=amd64 NOBOOKWORM="${NOBOOKWORM}" ${BUILD_OPTIONS})
+        if [ -n "${SONIC_BUILD_JOBS}" ]; then
+          cfg_args+=("SONIC_BUILD_JOBS=${SONIC_BUILD_JOBS}")
+        fi
+        if [ -n "${SONIC_BUILD_MEMORY}" ]; then
+          cfg_args+=("SONIC_BUILD_MEMORY=${SONIC_BUILD_MEMORY}")
+        fi
+        # Tee'd so the summary can say whether the slave image was reused.
+        make "${cfg_args[@]}" configure 2>&1 | tee "${RUNNER_TEMP}/configure.out"
+
+    - name: make images
+      working-directory: ${{ env.BUILD_DIR }}
+      run: |
+        set -euxo pipefail
+        make_args=(${BUILD_OPTIONS} NOBOOKWORM="${NOBOOKWORM}" "BUILD_NUMBER=${GITHUB_RUN_NUMBER}")
+        if [ -n "${SONIC_BUILD_JOBS}" ]; then
+          make_args+=("SONIC_BUILD_JOBS=${SONIC_BUILD_JOBS}")
+        fi
+        if [ -n "${SONIC_BUILD_MEMORY}" ]; then
+          make_args+=("SONIC_BUILD_MEMORY=${SONIC_BUILD_MEMORY}")
+        fi
+        # Tee rather than redirect: the live log is what a reader watches, and
+        # the captured copy is what the diagnosis step parses. pipefail keeps
+        # make's exit status, not tee's.
+        make "${make_args[@]}" ${BUILD_TARGETS} 2>&1 | tee "${RUNNER_TEMP}/make.out"
+        for t in ${BUILD_TARGETS}; do test -f "${t}"; done
+
+    - name: Diagnose failure
+      if: failure()
+      working-directory: ${{ env.BUILD_DIR }}
+      run: |
+        set -uo pipefail
+        if [ ! -f "${RUNNER_TEMP}/make.out" ]; then
+          echo "::warning::the build failed before make ran"
+          exit 0
+        fi
+
+        echo "::group::make errors"
+        grep -E '^[[:space:]]*make(\[[0-9]+\])?: \*\*\* ' "${RUNNER_TEMP}/make.out" | tail -n 20 || true
+        echo "::endgroup::"
+
+        # rules/functions sends every target's output to $@.log. make reports the
+        # failure once per nesting level, innermost first, and only the innermost
+        # rule names a target that has its own log, so walk the list backwards
+        # and take the first one that does.
+        log=""
+        while read -r rule; do
+          [ -n "${rule}" ] || continue
+          if [ -f "${rule}.log" ]; then log="${rule}.log"; break; fi
+        done < <(grep -oE '^[[:space:]]*make(\[[0-9]+\])?: \*\*\* \[[^]]*\]' "${RUNNER_TEMP}/make.out" \
+                   | sed -E 's#.*\[([^]]*)\]#\1#; s#^.*: ##' \
+                   | tac)
+
+        # Fall back to the most recently written log only when make's output
+        # named no rule that has one.
+        if [ -z "${log}" ]; then
+          log="$(find target -name '*.log' -type f -printf '%T@ %p\n' 2>/dev/null \
+                   | sort -rn | head -n 1 | cut -d' ' -f2-)"
+        fi
+
+        if [ -n "${log}" ] && [ -f "${log}" ]; then
+          echo "::error::build failed in ${log}"
+          { echo "### Build failed"; echo; echo "Failing target log: \`${log}\`"; } >> "${GITHUB_STEP_SUMMARY}"
+          echo "::group::last 300 lines of ${log}"
+          tail -n 300 "${log}"
+          echo "::endgroup::"
+        else
+          echo "::warning::no per-target log found; the build failed before any target started"
+        fi
+
+    - name: Build summary
+      if: always()
+      working-directory: ${{ env.BUILD_DIR }}
+      run: |
+        set -uo pipefail
+        cfg="${RUNNER_TEMP}/configure.out"
+        if [ -f "${cfg}" ]; then
+          base=$(grep -oE 'Checking sonic-slave-base image: sonic-slave-[a-z]+:[0-9a-f]+' "${cfg}" | tail -1 | awk '{print $NF}')
+          if grep -qE 'Image sonic-slave-[a-z]+:[0-9a-f]+ not found\. Building' "${cfg}"; then
+            slave="${base:-?}, built from scratch"
+          else
+            slave="${base:-?}, already present; build skipped"
+          fi
+        else
+          slave="configure did not run"
+        fi
+        {
+          echo "### ocs-kvm build"
+          echo
+          echo "| | |"
+          echo "|---|---|"
+          echo "| package cache | none, every run is from scratch |"
+          echo "| slave image | ${slave} |"
+          echo "| build jobs | ${SONIC_BUILD_JOBS:-rules/config formula} |"
+          echo "| container memory cap | ${SONIC_BUILD_MEMORY:-rules/config default} |"
+          echo "| bookworm env | $([ "${NOBOOKWORM}" = "1" ] && echo skipped || echo built) |"
+        } >> "${GITHUB_STEP_SUMMARY}"
+        df -h . || true
+
+    - name: Upload per-target build logs
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: ocs-kvm-logs-${{ github.run_number }}
+        path: ${{ env.BUILD_DIR }}/target/**/*.log
+        # Artifact storage is free on a public repository; 90 is the maximum
+        # it allows.
+        retention-days: 90
+        if-no-files-found: ignore
+
+    - name: Upload installer (input to the kvm-image job)
+      if: success()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: ocs-kvm-installer-${{ github.run_number }}
+        # Two files under one root (target/): the artifact holds
+        # sonic-ocs-kvm.bin and files/trixie/onie-recovery-*.iso, which is the
+        # layout the kvm-image job expects after downloading into target/.
+        path: |
+          ${{ env.BUILD_DIR }}/target/sonic-ocs-kvm.bin
+          ${{ env.BUILD_DIR }}/target/files/trixie/onie-recovery-*.iso
+        # A pull request's installer is for its reviewers; a merged or
+        # dispatched build's is kept for the maximum a public repository allows.
+        retention-days: ${{ github.event_name != 'pull_request' && 90 || 14 }}
+        # Already compressed; re-compressing costs minutes and saves nothing.
+        compression-level: 0
+
+  kvm-image:
+    name: kvm image (ocs-kvm)
+    needs: build
+    # Installs the .bin into a virtual disk and boots it, as
+    # `make target/sonic-ocs-kvm.img.gz` does, on a runner with hardware
+    # virtualization (label ocs-host).
+    runs-on: [ self-hosted, ocs-host ]
+    # Two install-and-boot cycles, BIOS and UEFI, take about ten minutes; with
+    # one retry each the worst case is under an hour.
+    timeout-minutes: 90
+    env:
+      # check_install.py logs in over the serial console with these. They are
+      # the build's defaults (BUILD_OPTIONS sets USERNAME=admin; the password is
+      # DEFAULT_PASSWORD in rules/config), not secrets.
+      SONIC_USERNAME: admin
+      SONIC_PASSWORD: YourPaSsWoRd
+
+    steps:
+    - name: Verify runner
+      run: |
+        set -uo pipefail
+        fail=0
+        bad() { echo "::error::$*"; fail=1; }
+        if [ -c /dev/kvm ]; then echo "ok   /dev/kvm present"; else bad "no /dev/kvm on this runner; making the image boots a VM"; fi
+        if [ -f /etc/ocs-fresh-instance ]; then
+          bad "wrong runner for this job; check the labels"
+        else
+          echo "ok   runner"
+        fi
+        if docker info >/dev/null 2>&1; then echo "ok   docker reachable"; else bad "docker is not reachable as $(id -un)"; fi
+        # The slave container image has kvm, telnet, pexpect and pigz. It is
+        # content-addressed; any trixie tag will do for this job.
+        img=$(docker images --format '{{.Repository}}:{{.Tag}}' sonic-slave-trixie 2>/dev/null | grep -v '<none>' | head -n 1 || true)
+        if [ -n "${img}" ]; then
+          echo "ok   slave image ${img}"
+          echo "SLAVE_IMAGE=${img}" >> "${GITHUB_ENV}"
+        else
+          bad "no sonic-slave-trixie image on this runner"
+        fi
+        [ "${fail}" -eq 0 ] || exit 1
+        # A run interrupted mid-way leaves root-owned files the runner cannot
+        # delete and checkout cannot clean. The container can.
+        if [ -e target ] || [ -e sonic-installer.img ]; then
+          docker run --rm --network none -v "${PWD}:/w" "${img}" rm -rf /w/target /w/sonic-installer.img
+        fi
+
+    - name: Checkout image scripts
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      with:
+        persist-credentials: false
+        fetch-depth: 1
+        # Only what build_kvm_image.sh needs; nothing is built here.
+        sparse-checkout: |
+          scripts/build_kvm_image.sh
+          install_sonic.py
+          check_install.py
+        sparse-checkout-cone-mode: false
+
+    - name: Download installer
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      with:
+        name: ocs-kvm-installer-${{ github.run_number }}
+        path: target
+
+    - name: Make the KVM image
+      run: |
+        set -euo pipefail
+        ls -l target target/files/trixie
+        # This is what build_image.sh's kvm branch does (build_image.sh:56, then
+        # pigz), pointed at the downloaded installer instead of a fresh tree. It
+        # runs inside the slave container because that image has the tools;
+        # --privileged is for /dev/kvm and the loop mount the script makes.
+        #
+        # --network none: nothing here needs a network. The installer VM talks
+        # to its drivers over loopback, the script's apt-get line asks for a
+        # package the image already has (a no-op offline), and the boot test's
+        # port forward on 0.0.0.0 (build_kvm_image.sh:132) binds only inside
+        # this empty namespace. The guest being booted is pull-request output
+        # and gets no route anywhere.
+        cat > "${RUNNER_TEMP}/kvm-image.sh" <<'EOF'
+        #!/bin/bash
+        set -euo pipefail
+        cd /sonic
+        # Everything here runs as root. Hand the results back to the workspace
+        # owner, even on failure, so the runner can upload and clean them.
+        trap 'chown -R --reference=/sonic /sonic/target /sonic/sonic-installer.img 2>/dev/null || true' EXIT
+        export PASSWD="${SONIC_PASSWORD}"
+        iso=$(ls target/files/trixie/onie-recovery-*.iso 2>/dev/null | head -n 1 || true)
+        [ -n "${iso}" ] || { echo "::error::no ONIE recovery ISO under target/files/trixie"; exit 1; }
+        # One retry per variant. The installer's drivers wait on fixed timeouts
+        # and the install occasionally wedges; a failed attempt leaves its VM
+        # running and holding the serial port, so kill it before trying again.
+        # The first attempt's output stays in the log, followed by the load on
+        # the machine at that moment.
+        build() {  # <image name> <BIOS|UEFI>
+          local attempt
+          for attempt in 1 2; do
+            pkill -f 'qemu-system-x86_64 .*-name onie' 2>/dev/null && sleep 3 || true
+            rm -f "target/$1.img" "target/$1.img.gz"
+            if ./scripts/build_kvm_image.sh "target/$1.img" "${iso}" target/sonic-ocs-kvm.bin 16 "$2"; then
+              pigz -f "target/$1.img"
+              ls -l "target/$1.img.gz"
+              return 0
+            fi
+            echo "::warning::$2 image: attempt ${attempt} failed"
+            echo "::group::load at failure"; uptime; vmstat 1 3 || true; df -h /sonic || true; echo "::endgroup::"
+          done
+          echo "::error::$2 image failed twice"
+          return 1
+        }
+        build sonic-ocs-kvm BIOS
+        # The UEFI variant keeps upstream's name (build_image.sh appends -uefi to
+        # the .img stem), which is what the platform README documents.
+        if [ -f /usr/share/OVMF/OVMF_CODE_4M.secboot.fd ]; then
+          build sonic-ocs-kvm.img-uefi UEFI
+        else
+          echo "::notice::no UEFI firmware in the slave image; UEFI variant skipped"
+        fi
+        EOF
+        docker run --rm --privileged --network none \
+          -v "${PWD}:/sonic" -v "${RUNNER_TEMP}/kvm-image.sh:/kvm-image.sh:ro" -w /sonic \
+          -e SONIC_USERNAME -e SONIC_PASSWORD \
+          "${SLAVE_IMAGE}" bash /kvm-image.sh
+
+    - name: Image summary
+      if: always()
+      run: |
+        set -uo pipefail
+        {
+          echo "### ocs-kvm image"
+          echo
+          echo "| image | size |"
+          echo "|---|---|"
+          for f in target/sonic-ocs-kvm.img.gz target/sonic-ocs-kvm.img-uefi.img.gz; do
+            if [ -f "${f}" ]; then
+              echo "| $(basename "${f}") | $(du -h "${f}" | cut -f1) |"
+            else
+              echo "| $(basename "${f}") | not produced |"
+            fi
+          done
+        } >> "${GITHUB_STEP_SUMMARY}"
+
+    - name: Upload KVM image
+      if: success()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      with:
+        name: sonic-buildimage.ocs-kvm-${{ github.run_number }}
+        path: target/sonic-ocs-kvm*.img.gz
+        # The maximum a public repository allows, for pull requests too: the
+        # image is what people come for.
+        retention-days: 90
+        compression-level: 0
+
+    - name: Clean workspace
+      if: always()
+      # Leave nothing behind for the next run: the installer disk is 5 GB and
+      # the image disk 16 GB (sparse). The trap above chowned them to us; if
+      # the container was killed before it ran, a container removes them.
+      run: |
+        rm -rf target sonic-installer.img 2>/dev/null \
+          || docker run --rm --network none -v "${PWD}:/w" "${SLAVE_IMAGE:-busybox}" rm -rf /w/target /w/sonic-installer.img \
+          || true
