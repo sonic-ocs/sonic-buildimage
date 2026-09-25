@@ -422,15 +422,17 @@ jobs:
         export PASSWD="${SONIC_PASSWORD}"
         iso=$(ls target/files/trixie/onie-recovery-*.iso 2>/dev/null | head -n 1 || true)
         [ -n "${iso}" ] || { echo "::error::no ONIE recovery ISO under target/files/trixie"; exit 1; }
-        # One retry per variant. The installer's drivers wait on fixed timeouts
-        # and the install occasionally wedges; a failed attempt leaves its VM
-        # running and holding the serial port, so kill it before trying again.
-        # The first attempt's output stays in the log, followed by the load on
-        # the machine at that moment.
+        # Up to three attempts per variant. Under UEFI the ONIE menu's keystrokes
+        # are occasionally lost (the firmware's serial driver and GRUB share the
+        # UART), so a retry is a genuine re-roll. A failed attempt leaves its VM
+        # running and holding the serial port: the process is /usr/bin/kvm, so
+        # match it by the VM name, then wait for the port to be released. Each
+        # attempt's output stays in the log, followed by the load at that moment.
         build() {  # <image name> <BIOS|UEFI>
           local attempt
-          for attempt in 1 2; do
-            pkill -f 'qemu-system-x86_64 .*-name onie' 2>/dev/null && sleep 3 || true
+          for attempt in 1 2 3; do
+            pkill -f -- '-name onie' 2>/dev/null || true; pkill -x telnet 2>/dev/null || true
+            for _ in $(seq 1 20); do netstat -ltn 2>/dev/null | grep -q ':9000 ' || break; sleep 1; done
             rm -f "target/$1.img" "target/$1.img.gz"
             if ./scripts/build_kvm_image.sh "target/$1.img" "${iso}" target/sonic-ocs-kvm.bin 16 "$2"; then
               pigz -f "target/$1.img"
@@ -440,7 +442,7 @@ jobs:
             echo "::warning::$2 image: attempt ${attempt} failed"
             echo "::group::load at failure"; uptime; vmstat 1 3 || true; df -h /sonic || true; echo "::endgroup::"
           done
-          echo "::error::$2 image failed twice"
+          echo "::error::$2 image failed after 3 attempts"
           return 1
         }
         build sonic-ocs-kvm BIOS
