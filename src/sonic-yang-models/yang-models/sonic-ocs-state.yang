@@ -1,9 +1,9 @@
-module sonic-ocs-states {
+module sonic-ocs-state {
 
   yang-version 1.1;
 
-  namespace "http://github.com/sonic-net/sonic-ocs-states";
-  prefix ocs-states;
+  namespace "http://github.com/sonic-net/sonic-ocs-state";
+  prefix ocs-state;
 
   description "YANG model for SONiC OCS operational data";
 
@@ -54,7 +54,7 @@ module sonic-ocs-states {
       "Status of the port";
   }
 
-  container sonic-ocs-states {
+  container sonic-ocs-state {
 
     container OCS_PORT {
       config false;
@@ -108,21 +108,21 @@ module sonic-ocs-states {
     
           leaf a_side {
             type leafref {
-              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST/simplex_port_id";
+              path "/sonic-ocs-state/OCS_PORT/OCS_PORT_LIST/simplex_port_id";
             }
             description "Simplex port ID for side A";
           }
     
           leaf b_side {
             type leafref {
-              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST/simplex_port_id";
+              path "/sonic-ocs-state/OCS_PORT/OCS_PORT_LIST/simplex_port_id";
             }
             description "Simplex port ID for side B";
           }
     
           leaf a_side_status {
             type leafref {
-              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST"
+              path "/sonic-ocs-state/OCS_PORT/OCS_PORT_LIST"
                  + "[simplex_port_id = current()/../a_side]/status";
             }
             description "Status (port_oper_status) from OCS_PORT_LIST for side A";
@@ -130,7 +130,7 @@ module sonic-ocs-states {
 
           leaf b_side_status {
             type leafref {
-              path "/sonic-ocs-states/OCS_PORT/OCS_PORT_LIST"
+              path "/sonic-ocs-state/OCS_PORT/OCS_PORT_LIST"
                  + "[simplex_port_id = current()/../b_side]/status";
             }
             description "Status (port_oper_status) from OCS_PORT_LIST for side B";

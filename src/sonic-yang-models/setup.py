@@ -224,7 +224,7 @@ yang_files = [
     'sonic-alarm.yang',
     'sonic-event.yang',
     'sonic-ocs.yang',
-    'sonic-ocs-states.yang',
+    'sonic-ocs-state.yang',
 ]
 
 class my_build_py(build_py):
